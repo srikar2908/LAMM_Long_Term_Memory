@@ -3,6 +3,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import os
+
 from app.agent.agent import LammAgent
 from app.core.config import Settings
 
@@ -21,11 +23,18 @@ DEMO_TURNS = [
 
 
 if __name__ == "__main__":
-    settings = Settings(database_url="sqlite:///storage/demo_lamm.db", faiss_index_path="storage/demo_vector_index", embedding_model="hash")
+    use_gemini = os.getenv("USE_GEMINI", "0") == "1"
+    settings = Settings(
+        gemini_api_key=os.getenv("GEMINI_API_KEY", "") if use_gemini else "",
+        database_url="sqlite:///storage/demo_lamm.db",
+        faiss_index_path="storage/demo_vector_index",
+        embedding_model="hash",
+    )
     if settings.sqlite_path.exists():
         settings.sqlite_path.unlink()
     agent = LammAgent(settings)
-    print("LAMM deterministic demo")
+    print("LAMM demo")
+    print("Mode:", "Gemini" if use_gemini and settings.gemini_available else "offline deterministic")
     for turn in DEMO_TURNS:
         response = agent.chat(turn, "final_demo")
         print(f"\nUSER: {turn}")

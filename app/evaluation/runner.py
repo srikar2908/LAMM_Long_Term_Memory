@@ -10,6 +10,11 @@ try:
     import matplotlib.pyplot as plt
 except Exception:
     plt = None
+try:
+    from PIL import Image, ImageDraw
+except Exception:
+    Image = None
+    ImageDraw = None
 
 from app.agent.agent import LammAgent
 from app.core.config import Settings
@@ -27,8 +32,18 @@ class EvaluationRunner:
 
     def run(self) -> dict:
         data = self.load_dataset()
-        lamm_settings = Settings(database_url="sqlite:///storage/eval_lamm.db", faiss_index_path="storage/eval_lamm_vector_index", embedding_model="hash")
-        baseline_settings = Settings(database_url="sqlite:///storage/eval_baseline.db", faiss_index_path="storage/eval_baseline_vector_index", embedding_model="hash")
+        lamm_settings = Settings(
+            gemini_api_key="",
+            database_url="sqlite:///storage/eval_lamm.db",
+            faiss_index_path="storage/eval_lamm_vector_index",
+            embedding_model="hash",
+        )
+        baseline_settings = Settings(
+            gemini_api_key="",
+            database_url="sqlite:///storage/eval_baseline.db",
+            faiss_index_path="storage/eval_baseline_vector_index",
+            embedding_model="hash",
+        )
         for path in [lamm_settings.sqlite_path, baseline_settings.sqlite_path]:
             if path.exists():
                 path.unlink()
@@ -100,4 +115,32 @@ class EvaluationRunner:
                 fig.savefig("results/figures/lifecycle_operations.png")
                 plt.close(fig)
         elif plt is None:
-            Path("results/figures/README.txt").write_text("Matplotlib is not installed; plots were skipped. Install requirements.txt to enable figures.")
+            self._write_fallback_figures(result, growth)
+
+    def _write_fallback_figures(self, result: dict, growth: pd.DataFrame) -> None:
+        if Image is None or ImageDraw is None:
+            Path("results/figures/README.txt").write_text("Matplotlib and Pillow are unavailable; plots were skipped. Install requirements.txt to enable figures.")
+            return
+        self._simple_png(
+            Path("results/figures/memory_growth.png"),
+            "Memory Growth Over Synthetic Turns",
+            [f"{row.system} turn {row.turn}: total={row.total}" for row in growth.itertuples()],
+        )
+        counts = result["lifecycle_operation_counts"]
+        self._simple_png(
+            Path("results/figures/lifecycle_operations.png"),
+            "LAMM Lifecycle Operation Distribution",
+            [f"{key}: {value}" for key, value in counts.items()],
+        )
+
+    def _simple_png(self, path: Path, title: str, lines: list[str]) -> None:
+        width = 1100
+        height = max(360, 80 + 26 * len(lines))
+        image = Image.new("RGB", (width, height), "white")
+        draw = ImageDraw.Draw(image)
+        draw.text((24, 20), title, fill=(20, 20, 20))
+        y = 64
+        for line in lines[:40]:
+            draw.text((32, y), line, fill=(45, 45, 45))
+            y += 26
+        image.save(path)

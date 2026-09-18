@@ -23,7 +23,7 @@ def _int(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "hash")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///storage/lamm.db")
     faiss_index_path: str = os.getenv("FAISS_INDEX_PATH", "storage/vector_index")
