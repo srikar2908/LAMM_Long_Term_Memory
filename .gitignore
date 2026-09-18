@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+*.db
+*.sqlite
+*.sqlite3
+storage/
+results/figures/*.png
+results/tables/*.csv
+results/reports/*.json
+results/reports/*.md
+faiss.index
+vector_index.*

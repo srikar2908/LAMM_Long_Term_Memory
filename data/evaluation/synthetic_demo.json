@@ -1,0 +1,21 @@
+{
+  "label": "SYNTHETIC DEMO DATA",
+  "conversation_id": "synthetic_demo_001",
+  "turns": [
+    {"role": "user", "text": "I prefer Python for backend development."},
+    {"role": "user", "text": "I am working on an AI project."},
+    {"role": "user", "text": "My project uses long-term LLM memory."},
+    {"role": "user", "text": "I also like machine learning."},
+    {"role": "user", "text": "Python is my preferred backend language."},
+    {"role": "user", "text": "I have started using Java for my current backend project."},
+    {"role": "user", "text": "Maybe remember that I sometimes browse AI news."},
+    {"role": "user", "text": "I am writing a detailed LAMM project explanation with memory extraction, scoring, redundancy detection, lifecycle decisions, SQLite persistence, vector retrieval, evaluation reports, and a Streamlit dashboard for review demonstration purposes."},
+    {"role": "user", "text": "This is temporary filler information that is not very useful for long term project personalization."}
+  ],
+  "memory_queries": [
+    {
+      "query": "What programming language am I currently using for my backend project?",
+      "expected_memory_ids": []
+    }
+  ]
+}
