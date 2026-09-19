@@ -1,13 +1,13 @@
+from __future__ import annotations
+
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import os
-
 from app.agent.agent import LammAgent
 from app.core.config import Settings
-
 
 DEMO_TURNS = [
     "I prefer Python for backend development.",
@@ -22,28 +22,55 @@ DEMO_TURNS = [
 ]
 
 
-if __name__ == "__main__":
+def run_realistic_demo():
     use_gemini = os.getenv("USE_GEMINI", "0") == "1"
+    gemini_key = os.getenv("GEMINI_API_KEY", "") if use_gemini else ""
+
     settings = Settings(
-        gemini_api_key=os.getenv("GEMINI_API_KEY", "") if use_gemini else "",
+        gemini_api_key=gemini_key,
         database_url="sqlite:///storage/demo_lamm.db",
         faiss_index_path="storage/demo_vector_index",
-        embedding_model="hash",
+        embedding_provider="hash",
+        embedding_model="deterministic-hash",
     )
+
+    # Clean up prior demo database and index
     if settings.sqlite_path.exists():
         settings.sqlite_path.unlink()
+    for p in [Path(settings.faiss_index_path).with_suffix(ext) for ext in [".faiss", ".mapping.json", ".npz"]]:
+        if p.exists():
+            p.unlink()
+
     agent = LammAgent(settings)
-    print("LAMM demo")
-    print("Mode:", "Gemini" if use_gemini and settings.gemini_available else "offline deterministic")
-    for turn in DEMO_TURNS:
-        response = agent.chat(turn, "final_demo")
-        print(f"\nUSER: {turn}")
+    mode_str = "Gemini LLM (online)" if use_gemini and settings.gemini_available else "Deterministic Mock (offline)"
+    print("=" * 70)
+    print("LAMM: Lightweight Adaptive Memory Management - Conversational Demo")
+    print(f"Operational Mode: {mode_str}")
+    print("=" * 70)
+
+    for turn_idx, turn in enumerate(DEMO_TURNS, start=1):
+        response = agent.chat(turn, conversation_id="demo_session")
+        print(f"\n[Turn {turn_idx}] USER: {turn}")
+        print(f"[Turn {turn_idx}] ASSISTANT: {response.response}")
         for decision in response.lifecycle_decisions:
-            print(f"DECISION: {decision['operation']} - {decision['reason']}")
-    final = agent.chat("What programming language am I currently using for my backend project?", "final_demo")
-    print("\nQUERY: What programming language am I currently using for my backend project?")
-    print(f"ASSISTANT: {final.response}")
-    print("RETRIEVED:")
-    for item in final.retrieved_memories:
-        print(f"- {item['text']} ({item['score']:.2f})")
-    print("STATS:", final.stats)
+            print(f"  -> LIFECYCLE DECISION: {decision['operation']} | Reason: {decision['reason']}")
+
+    # Final query verifying memory recall of updated information
+    query = "What programming language am I currently using for my backend project?"
+    print("\n" + "=" * 70)
+    print(f"FINAL TEST QUERY: {query}")
+    print("=" * 70)
+    final_response = agent.chat(query, conversation_id="demo_session")
+    print(f"\nASSISTANT: {final_response.response}")
+    print("\nRETRIEVED ACTIVE MEMORIES:")
+    for item in final_response.retrieved_memories:
+        print(f"  * {item['text']} (relevance score: {item['score']:.2f})")
+
+    print("\nFINAL SYSTEM METRICS & STATS:")
+    for k, v in final_response.stats.items():
+        print(f"  * {k}: {v}")
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    run_realistic_demo()

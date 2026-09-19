@@ -1,0 +1,25 @@
+# Demo configuration for deterministic fast offline execution
+embedding:
+  provider: hash
+  model: deterministic-hash
+  dimension: 384
+
+retrieval:
+  top_k: 5
+
+lamm:
+  relevance_weight: 0.30
+  recency_weight: 0.15
+  confidence_weight: 0.20
+  redundancy_weight: 0.25
+  utility_weight: 0.10
+  redundancy_threshold: 0.86
+  archive_threshold: 0.32
+  forget_threshold: 0.18
+  recency_decay: 0.03
+  compress_length: 180
+  max_active_memories: 100
+
+evaluation:
+  seed: 42
+  recency_baseline_budget: 5

@@ -1,9 +1,84 @@
 {
   "label": "SYNTHETIC DEMO DATA",
-  "conversation_id": "synthetic_demo_001",
+  "note": "Scenario-based synthetic dataset for reproducible offline research evaluation and demonstration.",
+  "conversation_id": "synthetic_eval_001",
+  "scenarios": [
+    {
+      "scenario_id": "scenario_01_retention",
+      "name": "Retention",
+      "description": "User states fundamental, durable preferences that should be actively retained.",
+      "turn": {"role": "user", "text": "I prefer Python for backend development."},
+      "expected_candidate": "User prefers Python for backend development.",
+      "expected_operation": "RETAIN"
+    },
+    {
+      "scenario_id": "scenario_02_retention_project",
+      "name": "Project Context",
+      "description": "User describes long-term ongoing technical project.",
+      "turn": {"role": "user", "text": "I am working on an AI agent project."},
+      "expected_candidate": "User is working on an AI agent project.",
+      "expected_operation": "RETAIN"
+    },
+    {
+      "scenario_id": "scenario_03_retention_memory",
+      "name": "Architecture Preference",
+      "description": "User introduces specific architectural component.",
+      "turn": {"role": "user", "text": "My project uses long-term LLM memory."},
+      "expected_candidate": "User's project uses long-term LLM memory.",
+      "expected_operation": "RETAIN"
+    },
+    {
+      "scenario_id": "scenario_04_retention_interest",
+      "name": "Technical Interest",
+      "description": "User mentions broad domain enthusiasm.",
+      "turn": {"role": "user", "text": "I also like machine learning."},
+      "expected_candidate": "User likes machine learning.",
+      "expected_operation": "RETAIN"
+    },
+    {
+      "scenario_id": "scenario_05_redundancy_merge",
+      "name": "Redundancy / Merge",
+      "description": "User states semantically redundant preference that should be merged with existing memory rather than duplicated.",
+      "turn": {"role": "user", "text": "Python is my preferred backend language."},
+      "expected_candidate": "Python is the user's preferred backend language.",
+      "expected_operation": "MERGE"
+    },
+    {
+      "scenario_id": "scenario_06_update_supersession",
+      "name": "Information Update",
+      "description": "User states that they have switched tools for their current project, which supersedes prior backend language fact.",
+      "turn": {"role": "user", "text": "I have started using Java for my current backend project."},
+      "expected_candidate": "User has started using Java for my current backend project.",
+      "expected_operation": "UPDATE"
+    },
+    {
+      "scenario_id": "scenario_07_archival_low_confidence",
+      "name": "Archival",
+      "description": "User gives tentative, speculative low-confidence information that should be archived rather than kept in active pool.",
+      "turn": {"role": "user", "text": "Maybe remember that I sometimes browse AI news."},
+      "expected_candidate": "Possible low-confidence memory: I sometimes browse AI news.",
+      "expected_operation": "ARCHIVE"
+    },
+    {
+      "scenario_id": "scenario_08_compression",
+      "name": "Compression",
+      "description": "User provides verbose multi-clause explanation that should be compressed to preserve essential facts without token bloat.",
+      "turn": {"role": "user", "text": "I am writing a detailed LAMM project explanation with memory extraction, scoring, redundancy detection, lifecycle decisions, SQLite persistence, vector retrieval, evaluation reports, and a Streamlit dashboard for review demonstration purposes."},
+      "expected_candidate": "User is writing a detailed LAMM project explanation...",
+      "expected_operation": "COMPRESS"
+    },
+    {
+      "scenario_id": "scenario_09_forgetting_filler",
+      "name": "Forgetting",
+      "description": "User provides ephemeral filler information that has zero long-term utility and must be forgotten.",
+      "turn": {"role": "user", "text": "This is temporary filler information that is not very useful for long term project personalization."},
+      "expected_candidate": "Temporary filler...",
+      "expected_operation": "FORGET"
+    }
+  ],
   "turns": [
     {"role": "user", "text": "I prefer Python for backend development."},
-    {"role": "user", "text": "I am working on an AI project."},
+    {"role": "user", "text": "I am working on an AI agent project."},
     {"role": "user", "text": "My project uses long-term LLM memory."},
     {"role": "user", "text": "I also like machine learning."},
     {"role": "user", "text": "Python is my preferred backend language."},
@@ -14,8 +89,22 @@
   ],
   "memory_queries": [
     {
+      "query_id": "q1_current_backend",
       "query": "What programming language am I currently using for my backend project?",
-      "expected_memory_ids": []
+      "expected_topic_keywords": ["java", "backend", "project"],
+      "ground_truth_available": true
+    },
+    {
+      "query_id": "q2_project_domain",
+      "query": "What AI project and architecture am I working on?",
+      "expected_topic_keywords": ["ai agent", "long-term", "memory"],
+      "ground_truth_available": true
+    },
+    {
+      "query_id": "q3_unannotated_query",
+      "query": "Tell me something general about software engineering.",
+      "expected_topic_keywords": [],
+      "ground_truth_available": false
     }
   ]
 }

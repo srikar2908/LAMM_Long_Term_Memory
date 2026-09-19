@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 
 import numpy as np
 
 from app.embeddings.base import EmbeddingProvider
+
+logger = logging.getLogger("lamm.embeddings")
 
 
 def _normalize(vectors: np.ndarray) -> np.ndarray:
@@ -15,7 +18,7 @@ def _normalize(vectors: np.ndarray) -> np.ndarray:
 
 
 class HashEmbeddingProvider(EmbeddingProvider):
-    """Deterministic offline embedding provider for tests and demos."""
+    """Deterministic offline embedding provider for reproducible tests and fast demos."""
 
     def __init__(self, dimension: int = 384):
         self.dimension = dimension
@@ -33,26 +36,44 @@ class HashEmbeddingProvider(EmbeddingProvider):
 
 
 class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
+    """Local embedding provider powered by sentence-transformers."""
+
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", fallback_dimension: int = 384):
         self.model_name = model_name
+        self.model = None
+        self.fallback = HashEmbeddingProvider(fallback_dimension)
         try:
             from sentence_transformers import SentenceTransformer
 
             self.model = SentenceTransformer(model_name)
-            self.dimension = int(self.model.get_sentence_embedding_dimension())
-        except Exception:
+            # Use get_embedding_dimension if available (sentence-transformers >= 3.0), else get_sentence_embedding_dimension
+            if hasattr(self.model, "get_embedding_dimension"):
+                self.dimension = int(self.model.get_embedding_dimension())
+            else:
+                self.dimension = int(self.model.get_sentence_embedding_dimension())
+            logger.info(f"Loaded SentenceTransformer '{model_name}' (dimension={self.dimension})")
+        except Exception as exc:
+            logger.warning(f"Failed to load SentenceTransformer '{model_name}': {exc}. Falling back to HashEmbeddingProvider.")
             self.model = None
-            self.fallback = HashEmbeddingProvider(fallback_dimension)
             self.dimension = fallback_dimension
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if self.model is None:
             return self.fallback.embed(texts)
-        vectors = self.model.encode(texts, convert_to_numpy=True).astype("float32")
-        return _normalize(vectors)
+        try:
+            vectors = self.model.encode(texts, convert_to_numpy=True).astype("float32")
+            return _normalize(vectors)
+        except Exception as exc:
+            logger.error(f"Encoding error with SentenceTransformer: {exc}. Using fallback.")
+            return self.fallback.embed(texts)
 
 
-def build_embedding_provider(model_name: str, dimension: int = 384) -> EmbeddingProvider:
-    if model_name.lower() in {"hash", "mock", "deterministic"}:
+def build_embedding_provider(
+    provider: str = "sentence_transformer",
+    model_name: str = "all-MiniLM-L6-v2",
+    dimension: int = 384,
+) -> EmbeddingProvider:
+    provider_clean = (provider or "").strip().lower()
+    if provider_clean in {"hash", "mock", "deterministic"} or model_name.lower() in {"hash", "mock", "deterministic"}:
         return HashEmbeddingProvider(dimension)
-    return SentenceTransformerEmbeddingProvider(model_name, dimension)
+    return SentenceTransformerEmbeddingProvider(model_name=model_name, fallback_dimension=dimension)

@@ -42,14 +42,16 @@ class DeterministicMemoryExtractor(MemoryExtractor):
                         metadata={"pattern": pattern.pattern},
                     )
                 )
-        if not candidates and len(user_message.split()) > 12:
-            confidence = 0.35 if "temporary" in user_message.lower() or "not very useful" in user_message.lower() else 0.55
+        if not candidates and user_message.strip():
+            msg_lower = user_message.lower()
+            is_ephemeral = "temporary" in msg_lower or "not very useful" in msg_lower or "filler" in msg_lower
+            confidence = 0.35 if is_ephemeral else (0.60 if len(user_message.split()) > 10 else 0.50)
             candidates.append(
                 CandidateMemory(
                     text=user_message.strip(),
                     confidence_score=confidence,
-                    source="deterministic_long_text",
-                    metadata={"note": "Long user message retained as low-confidence candidate."},
+                    source="deterministic_fallback",
+                    metadata={"is_ephemeral": is_ephemeral},
                 )
             )
         return candidates
