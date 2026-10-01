@@ -148,6 +148,7 @@ class MemoryManager:
             source=candidate.source,
             embedding=embedding,
             status=LifecycleStatus.ACTIVE,
+            metadata=candidate.metadata,
         )
         self.events.record(record.id, decision, after_state=record.model_dump(mode="json"))
         return decision, record
@@ -185,6 +186,7 @@ class MemoryManager:
             source=candidate.source,
             embedding=embedding,
             status=LifecycleStatus.ACTIVE,
+            metadata=candidate.metadata,
         )
         decision = LifecycleDecision(
             operation=LifecycleOperation.RETAIN,
@@ -215,6 +217,7 @@ class MemoryManager:
                 existing.updated_at = now
                 existing.confidence_score = max(existing.confidence_score, candidate.confidence_score)
                 existing.lifecycle_status = LifecycleStatus.ACTIVE
+                existing.metadata.update(candidate.metadata)
                 existing.metadata["update_reason"] = decision.reason
                 existing.metadata["prior_text"] = decision.metadata.get("prior_text")
                 new_embedding = self.embedder.embed_one(candidate.text)
@@ -231,6 +234,7 @@ class MemoryManager:
                 existing.text = merged_text
                 existing.updated_at = now
                 existing.lifecycle_status = LifecycleStatus.ACTIVE
+                existing.metadata.update(candidate.metadata)
                 existing.metadata["merge_reason"] = decision.reason
                 new_embedding = self.embedder.embed_one(merged_text)
                 self.memories.update(existing, new_embedding)
@@ -250,6 +254,7 @@ class MemoryManager:
                 status=LifecycleStatus.ACTIVE,
                 archived=False,
                 compressed_text=candidate.text,
+                metadata=candidate.metadata,
             )
             record.metadata["original_verbose_text"] = candidate.text
             self.memories.update(record, comp_embedding)
@@ -265,6 +270,7 @@ class MemoryManager:
                 embedding=embedding,
                 status=LifecycleStatus.FORGOTTEN,
                 archived=False,
+                metadata=candidate.metadata,
             )
 
         # 5. ARCHIVE: store in SQLite, mark archived, omit from active FAISS index
@@ -277,6 +283,7 @@ class MemoryManager:
                 embedding=embedding,
                 status=LifecycleStatus.ARCHIVED,
                 archived=True,
+                metadata=candidate.metadata,
             )
 
         # 6. RETAIN: standard active memory
@@ -288,6 +295,7 @@ class MemoryManager:
             embedding=embedding,
             status=LifecycleStatus.ACTIVE,
             archived=False,
+            metadata=candidate.metadata,
         )
 
     def _create_memory(
@@ -300,6 +308,7 @@ class MemoryManager:
         status: LifecycleStatus = LifecycleStatus.ACTIVE,
         archived: bool = False,
         compressed_text: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryRecord:
         now = datetime.now(timezone.utc)
         record = MemoryRecord(
@@ -313,6 +322,7 @@ class MemoryManager:
             conversation_id=conversation_id,
             archived=archived,
             compressed_text=compressed_text,
+            metadata=metadata or {},
         )
         self.memories.create(record, embedding)
         # Add to vector index only if status is ACTIVE
