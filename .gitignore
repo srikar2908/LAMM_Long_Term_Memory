@@ -1,17 +1,31 @@
+# Environment and Virtual Environments
 .env
 .venv/
 lammenv/
+
+# Python caches
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
+
+# Databases and Local Storage
 *.db
 *.sqlite
 *.sqlite3
 storage/
+faiss.index
+vector_index.*
+
+# Results / Generated Artifacts
 results/figures/*.png
 results/tables/*.csv
 results/reports/*.json
 results/reports/*.md
-faiss.index
-vector_index.*
+
+# VS Code
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json

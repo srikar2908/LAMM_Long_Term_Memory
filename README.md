@@ -1,388 +1,206 @@
 # LAMM: Lightweight Adaptive Memory Management for Long-Term LLM Agents
 
-LAMM is a runnable B.Tech mini-project research prototype for long-term memory management in LLM-based agents. It implements an external memory-management layer that decides what should happen to newly extracted memories instead of blindly storing every fact forever.
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B.svg)](https://streamlit.io/)
+[![FAISS](https://img.shields.io/badge/FAISS-CPU%201.8+-blueviolet.svg)](https://github.com/facebookresearch/faiss)
+[![Tests Passing](https://img.shields.io/badge/Tests-32%20Passed-brightgreen.svg)]()
 
-The core idea is to treat memory as a lifecycle:
+LAMM is a complete, runnable research prototype for long-term memory management in Large Language Model (LLM) agents. Built as a B.Tech mini-project in AI/ML, it introduces an external, training-free memory lifecycle layer that dynamically decides whether incoming knowledge should be retained, updated, merged, compressed, archived, or forgotten—preventing unbounded memory growth, prompt token bloat, and contradictory context.
 
-```text
-RETAIN -> UPDATE -> MERGE -> COMPRESS -> ARCHIVE -> FORGET
-```
+---
 
-The implementation is training-free, explainable, and locally runnable. Gemini is optional. The system can run fully offline using deterministic extraction, mock LLM responses, SQLite, and a local FAISS vector index.
+## 1. Key Concepts: Lifecycle Operations vs. Decision Priority
 
-## Current Implementation Status
+LAMM makes an explicit architectural distinction between the **lifecycle vocabulary** and the **decision priority engine**:
 
-Implemented:
+* **Lifecycle Operations (Conceptual Progression):**
+  $$\text{Retain} \longrightarrow \text{Update} \longrightarrow \text{Merge} \longrightarrow \text{Compress} \longrightarrow \text{Archive} \longrightarrow \text{Forget}$$
+* **Decision Priority Engine (Execution Order):**
+  $$\text{Update} \longrightarrow \text{Merge} \longrightarrow \text{Compress} \longrightarrow \text{Forget} \longrightarrow \text{Archive} \longrightarrow \text{Retain}$$
 
-- FastAPI backend.
-- Streamlit dashboard.
-- Gemini adapter using API key from `.env`.
-- Offline deterministic mock mode.
-- SQLite memory metadata database.
-- Local FAISS vector index for semantic retrieval.
-- NumPy fallback behavior for vector search if needed.
-- Memory extraction component.
-- Weighted memory scoring.
-- Recency, confidence, redundancy, utility, and relevance signals.
-- Lifecycle controller for `RETAIN`, `UPDATE`, `MERGE`, `COMPRESS`, `ARCHIVE`, and `FORGET`.
-- Lifecycle event logging.
-- Unmanaged memory baseline.
-- Synthetic demo dataset.
-- Evaluation runner.
-- CSV, JSON, Markdown, and PNG result artifacts.
-- Unit tests and end-to-end mock pipeline test.
+> **Architectural Invariant:** Relational decisions (modifications and deduplications) are always evaluated before score-based eviction. This ensures an incoming knowledge update is never mistakenly dropped due to a lower score.
 
-Not claimed:
+---
 
-- This project does not claim LAMM is scientifically superior before proper experiments.
-- The included synthetic dataset is demo data, not a benchmark.
-- Default weights and thresholds are engineering assumptions, not validated constants.
+## 2. Current Implementation Status
 
-## Problem Statement
+- [x] **Core Lifecycle Engine:** 6 explicit lifecycle operations with explainable natural-language decision logs.
+- [x] **Weighted Scoring:** Transparent 5-factor scoring (Relevance, Recency, Confidence, Redundancy, Utility).
+- [x] **Evidence-Based Update Detection:** Regex and semantic indicators detect modifications and contradictions.
+- [x] **Dual Storage Subsystem:** SQLite as canonical source of truth; local FAISS vector store for top-$k$ similarity search.
+- [x] **LLM Independence & Offline Mode:** 100% runnable offline with deterministic mock LLM; optional Gemini API integration via `.env`.
+- [x] **3-Way Fair Comparative Evaluation:** Benchmarked against `UNMANAGED_MEMORY` (no eviction) and `RECENCY_ONLY` (fixed LRU budget).
+- [x] **Rich Evaluation Artifacts:** Automated generation of 6 Matplotlib figures, 3 CSV tables, JSON metrics, and academic Markdown reports.
+- [x] **FastAPI Backend:** 11 RESTful endpoints including semantic search, dry-run simulation, and privacy deletion.
+- [x] **Streamlit Dashboard:** 4-page UI for live chat, memory database inspection, analytics, and 3-way evaluation comparisons.
+- [x] **VS Code Integration:** Pre-configured `.vscode/launch.json` and `.vscode/settings.json` for one-click debugging.
+- [x] **Comprehensive Test Suite:** 32 passing unit and integration tests across 9 test modules.
 
-Long-term LLM agents need persistent memory to support coherent, personalized conversations. However, storing every extracted fact creates several problems:
+---
 
-- redundant memories
-- outdated memories
-- irrelevant memories
-- low-confidence memories
-- increasing storage size
-- increasing retrieval overhead
-- larger LLM prompts
-- higher latency
-- higher token consumption
-- higher inference cost
+## 3. Problem Statement & Research Questions
 
-LAMM addresses this by applying explicit memory lifecycle decisions before memory growth becomes unmanaged.
+### Problem Statement
+Persistent LLM agents face severe degradation when retaining all conversational history unconditionally:
+1. **Unbounded Storage Growth:** Memory size increases linearly with turns.
+2. **Context Bloat & Cost:** Retrieving redundant facts inflates prompt token consumption and inference latency.
+3. **Knowledge Conflicts:** Outdated facts (e.g., old preferences) contradict newer updates, causing agent hallucinations.
 
-## Aim
+### Research Questions
+1. *Can an external, training-free lifecycle controller regulate memory growth using interpretable heuristic scoring?*
+2. *Does evidence-based update detection resolve knowledge contradictions better than standard persistence?*
+3. *How much memory footprint and prompt token reduction can be achieved compared to unmanaged persistence and fixed-budget LRU baselines?*
 
-To design and implement a lightweight, explainable, training-free memory-management layer for long-term LLM agents that can dynamically manage memory growth while preserving useful conversational information.
+---
 
-## Research Questions
-
-1. Can a training-free lifecycle controller manage long-term memories using transparent scoring?
-2. How does adaptive memory management compare with unmanaged persistent memory?
-3. Can lifecycle decisions reduce unnecessary memory growth while preserving relevant retrieval?
-4. What metrics can be measured reproducibly in a student research prototype?
-
-## Objectives
-
-- Store long-term memories persistently.
-- Retrieve relevant memories using vector similarity.
-- Score memories using interpretable signals.
-- Detect redundant or update-like memories.
-- Apply lifecycle operations in a transparent way.
-- Keep Gemini optional, not mandatory.
-- Provide an offline demo mode for review panels.
-- Compare LAMM against an unmanaged memory baseline.
-- Save evaluation outputs for reports and presentations.
-
-## Architecture Overview
+## 4. Architecture Overview
 
 ```mermaid
 flowchart TD
-    U[User Message] --> R[Retrieve Relevant Memories]
-    R --> C[Build Context]
-    C --> L[LLM or Mock LLM]
-    L --> RESP[Assistant Response]
-    U --> E[Memory Extraction]
-    RESP --> E
-    E --> EMB[Generate Embedding]
-    EMB --> LC[LAMM Lifecycle Controller]
-    LC --> D{Decision}
-    D --> RETAIN[Retain]
-    D --> UPDATE[Update]
-    D --> MERGE[Merge]
-    D --> COMPRESS[Compress]
-    D --> ARCHIVE[Archive]
-    D --> FORGET[Forget]
-    RETAIN --> S[(SQLite + Local FAISS)]
-    UPDATE --> S
-    MERGE --> S
-    COMPRESS --> S
-    ARCHIVE --> S
-    FORGET --> S
-    S --> R
+    U["User Message"] --> RET["1. Retrieve Active Memories (FAISS)"]
+    RET --> CB["2. Build Prompt Context & Count Tokens"]
+    CB --> LLM["3. LLM / Mock Generation"]
+    LLM --> RESP["4. Assistant Response"]
+    RESP --> EXT["5. Extract Candidate Facts"]
+    U --> EXT
+    EXT --> EMB["6. Generate Embeddings"]
+    EMB --> LC["7. LAMM Lifecycle Controller"]
+    
+    LC --> DEC{"Decision Priority Engine"}
+    DEC -- "1" --> OP_UPD["UPDATE (In-Place Edit)"]
+    DEC -- "2" --> OP_MRG["MERGE (Deduplicate)"]
+    DEC -- "3" --> OP_CMP["COMPRESS (In-Place Text Condensation)"]
+    DEC -- "4" --> OP_FGT["FORGET (Evict / Discard)"]
+    DEC -- "5" --> OP_ARC["ARCHIVE (Store Inactive)"]
+    DEC -- "6" --> OP_RET["RETAIN (Store Active)"]
+    
+    OP_UPD --> DB[("SQLite DB (Source of Truth) + FAISS")]
+    OP_MRG --> DB
+    OP_CMP --> DB
+    OP_FGT --> DB
+    OP_ARC --> DB
+    OP_RET --> DB
 ```
 
-## Important Design Principle
+---
 
-LAMM is independent from the underlying LLM.
+## 5. Storage Design: SQLite as Source of Truth
 
-Gemini is used only for LLM behavior when configured. The memory lifecycle controller is implemented in Python and does not hide its logic inside prompts.
+LAMM does **not** require any cloud vector database subscriptions. It runs completely locally:
+- **SQLite (`storage/lamm.db`):** Stores memory text, active status, creation/update timestamps, access counts, full 5-signal scores, and immutable lifecycle decision audit trails.
+- **FAISS (`storage/vector_index.faiss`):** Stores normalized dense embedding vectors of **only active** memories for fast cosine similarity lookup.
+- **Synchronization:** When memories are compressed, their vector is updated in-place; when archived or forgotten, their vector is immediately removed from the FAISS active retrieval pool.
 
-The Python controller handles:
+---
 
-- scoring
-- duplicate detection
-- lifecycle decisions
-- metadata updates
-- vector index updates
-- event logging
-- retrieval integration
+## 6. Technology Stack
 
-## Do We Need A Vector DB URL?
+- **Core:** Python 3.12, FastAPI, Pydantic v2, SQLite3, FAISS-CPU, NumPy, Pandas, Matplotlib, PyYAML, Pytest
+- **LLM Engine:** Deterministic Mock LLM (default / offline) or Google Gemini API (`google-generativeai`)
+- **Embeddings:** Deterministic hash embeddings (384-d, zero dependencies) or Sentence-Transformers (`all-MiniLM-L6-v2`)
+- **User Interface:** Streamlit (4-page research dashboard)
 
-No. This project does not require a cloud vector database URL.
+---
 
-The current implementation stores vectors locally and offline:
-
-- Memory text and metadata are stored in SQLite.
-- Embeddings are stored in a local FAISS index.
-- A mapping file connects vector index entries to SQLite memory IDs.
-
-This is intentional. For a B.Tech mini-project prototype, local FAISS is:
-
-- easier to run
-- cheaper
-- private
-- offline-compatible
-- good for demonstrations
-- scientifically acceptable for a retrieval prototype
-
-A cloud vector database such as Pinecone, Qdrant Cloud, Weaviate, or Milvus can be added later by implementing another `VectorStore` adapter.
-
-## Storage Design
-
-SQLite is the source of truth.
-
-Stored in SQLite:
-
-- memory ID
-- memory text
-- timestamps
-- lifecycle status
-- confidence score
-- relevance score
-- recency score
-- redundancy score
-- utility score
-- source
-- conversation ID
-- archive status
-- compressed text
-- parent memory ID
-- metadata
-- lifecycle events
-
-Stored in FAISS/local vector files:
-
-- normalized embedding vectors
-- vector-to-memory mapping
-
-FAISS is not treated as the metadata database. It is only the retrieval index.
-
-## Technology Stack
-
-Core:
-
-- Python 3.11+
-- FastAPI
-- Pydantic
-- SQLite
-- FAISS
-- NumPy
-- Pandas
-- Matplotlib
-- pytest
-
-LLM:
-
-- Google Gemini API through `.env`
-- deterministic mock LLM when Gemini is unavailable or disabled
-
-Embeddings:
-
-- deterministic hash embeddings by default
-- optional `sentence-transformers` support via `requirements-ml.txt`
-
-UI:
-
-- Streamlit
-
-## Project Structure
+## 7. Project Structure
 
 ```text
 LAMM/
-├── README.md
-├── LICENSE
-├── .env.example
-├── .gitignore
-├── requirements.txt
-├── requirements-ml.txt
-├── pyproject.toml
-├── app/
-├── dashboard/
-├── data/
-├── docs/
-├── scripts/
-├── tests/
-└── results/
+├── .env.example                  # Environment configuration template
+├── .gitignore                    # Git exclusion rules for DBs, figures, and caches
+├── README.md                     # Main project documentation
+├── pyproject.toml                # Project metadata
+├── requirements.txt              # Production dependencies
+├── requirements-ml.txt           # Optional ML dependencies (sentence-transformers)
+├── .vscode/                      # VS Code integration
+│   ├── launch.json               # 5 pre-configured F5 debug/run tasks
+│   └── settings.json             # Python interpreter and pytest configuration
+├── app/                          # Main application package
+│   ├── main.py                   # FastAPI application entrypoint
+│   ├── agent/                    # Conversational agent, prompt builder, LLM adapters
+│   ├── api/                      # 11 RESTful endpoints (chat, memory, evaluation)
+│   ├── core/                     # Configuration system, YAML loader, logging
+│   ├── embeddings/               # Deterministic hash & SentenceTransformer providers
+│   ├── evaluation/               # 3-way evaluation harness, LRU baseline, metrics, report
+│   ├── memory/                   # Controller, scoring, deduplication, compression, manager
+│   ├── retrieval/                # FAISS vector store with remove/rebuild capabilities
+│   └── storage/                  # SQLite schema, migrations, and repositories
+├── configs/                      # Modular YAML configurations
+│   ├── default.yaml              # Default weights, thresholds, and dimensions
+│   ├── demo.yaml                 # Configuration for deterministic demonstration
+│   └── evaluation.yaml           # Configuration for 3-way evaluation harness
+├── dashboard/                    # Interactive UI
+│   └── streamlit_app.py          # 4-page Streamlit research dashboard
+├── data/evaluation/              # Synthetic evaluation scenarios
+│   └── synthetic_demo.json       # 9-turn annotated scenario with ground-truth queries
+├── docs/                         # In-depth architectural and mathematical docs
+│   ├── architecture.md           # Subsystems, data flow, and design principles
+│   ├── lamm_algorithm.md         # Mathematical formulation and decision tree
+│   ├── evaluation.md             # Two-level evaluation framework & metric definitions
+│   └── vscode_setup.md           # Step-by-step VS Code & virtual environment guide
+├── results/                      # Evaluation experiment outputs (generated)
+│   ├── figures/                  # 6 Matplotlib PNG charts
+│   ├── reports/                  # Markdown & JSON evaluation reports
+│   └── tables/                   # CSV performance tables
+├── scripts/                      # Runnable automation scripts
+│   ├── run_demo.py               # 9-turn deterministic CLI demonstration
+│   ├── run_evaluation.py         # 3-way evaluation execution runner
+│   └── run_gemini_smoke.py       # Gemini API validation test
+└── tests/                        # 32 passing unit and integration tests
 ```
 
-Important directories:
+---
 
-- `app/`: backend, agent pipeline, memory lifecycle logic, retrieval, storage, evaluation.
-- `dashboard/`: Streamlit research dashboard.
-- `docs/`: architecture, algorithm, and evaluation notes.
-- `scripts/`: command-line demo, evaluation, Gemini smoke test, DB/index utilities.
-- `tests/`: pytest coverage.
-- `data/evaluation/`: synthetic demo dataset.
-- `results/`: generated tables, reports, and figures.
+## 8. Quick Start (Using `lammenv`)
 
-## Main Modules
+> **Full VS Code Guide:** See [docs/vscode_setup.md](docs/vscode_setup.md) for detailed instructions on selecting the interpreter, running with F5, and debugging.
 
-### `app/memory/schemas.py`
-
-Defines memory-related Pydantic models:
-
-- `CandidateMemory`
-- `MemoryRecord`
-- `LifecycleDecision`
-- `ScoreBundle`
-- `RetrievedMemory`
-- lifecycle status enums
-- lifecycle operation enums
-
-### `app/memory/extraction.py`
-
-Extracts memory candidates from conversations.
-
-Modes:
-
-- deterministic rule-based extraction for offline demos and tests
-- Gemini-based extraction when enabled
-
-LLM output is validated with Pydantic before use.
-
-### `app/memory/scoring.py`
-
-Implements interpretable scoring:
-
-```text
-score = relevance*w_relevance
-      + recency*w_recency
-      + confidence*w_confidence
-      + utility*w_utility
-      - redundancy*w_redundancy
+### 1. Run the Deterministic 9-Turn Demo
+```powershell
+.\lammenv\Scripts\python.exe scripts\run_demo.py
 ```
 
-Also includes exponential recency decay.
+### 2. Run the 3-Way Comparative Evaluation
+```powershell
+.\lammenv\Scripts\python.exe scripts\run_evaluation.py
+```
+*Outputs generated in `results/figures/`, `results/tables/`, and `results/reports/`.*
 
-### `app/memory/lifecycle.py`
-
-Contains the central LAMM lifecycle controller.
-
-It decides:
-
-- `RETAIN`
-- `UPDATE`
-- `MERGE`
-- `COMPRESS`
-- `ARCHIVE`
-- `FORGET`
-
-Every decision includes a reason and score bundle.
-
-### `app/memory/manager.py`
-
-Coordinates:
-
-- extraction
-- embedding
-- retrieval
-- lifecycle decisions
-- SQLite updates
-- FAISS updates
-- event logging
-
-### `app/retrieval/faiss_store.py`
-
-Implements local vector retrieval using FAISS with normalized inner product. It persists:
-
-- FAISS index
-- NumPy fallback vectors
-- mapping from vector entries to memory IDs
-
-### `app/storage/database.py`
-
-Creates SQLite tables:
-
-- `conversations`
-- `memories`
-- `lifecycle_events`
-
-### `app/agent/agent.py`
-
-Runs the end-to-end agent pipeline:
-
-1. receive user message
-2. retrieve relevant memories
-3. build prompt context
-4. generate response
-5. extract candidate memories
-6. score and decide lifecycle action
-7. persist updates
-8. return response, retrieved memories, extracted memories, decisions, and stats
-
-## Memory Lifecycle Operations
-
-### RETAIN
-
-Stores a useful new memory as active.
-
-Example:
-
-```text
-User prefers Python for backend development.
+### 3. Run the Unit Test Suite
+```powershell
+.\lammenv\Scripts\python.exe -m pytest
 ```
 
-### UPDATE
-
-Updates an existing memory when new information modifies it.
-
-Example:
-
-```text
-Old: User prefers Python for backend development.
-New: User has started using Java for current backend project.
+### 4. Launch the FastAPI Server
+```powershell
+.\lammenv\Scripts\uvicorn.exe app.main:app --reload
 ```
+*Interactive Swagger docs available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).*
 
-### MERGE
-
-Combines redundant memories.
-
-Example:
-
-```text
-Memory 1: User prefers Python for backend development.
-Memory 2: Python is the user's preferred backend language.
+### 5. Launch the Streamlit Research Dashboard
+```powershell
+.\lammenv\Scripts\streamlit.exe run dashboard\streamlit_app.py
 ```
+*Dashboard available at [http://localhost:8501](http://localhost:8501).*
 
-### COMPRESS
+---
 
-Shortens verbose memories while preserving meaning.
+## 9. Configuration & Environment Variables
 
-### ARCHIVE
+LAMM supports layered configuration via `configs/default.yaml` and `.env`:
 
-Stores low-priority or low-confidence memories outside normal active retrieval.
-
-### FORGET
-
-Marks a memory as forgotten and removes it from active retrieval. The vector index is rebuilt when needed to avoid stale retrieval mappings.
-
-## Configuration
-
-Create `.env` from `.env.example`.
-
-```text
-GEMINI_API_KEY=
+```ini
+# .env (Optional: for cloud Gemini integration)
+GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-flash-latest
-EMBEDDING_MODEL=hash
+
+# Embeddings & Storage
+EMBEDDING_PROVIDER=hash         # 'hash' (offline) or 'sentence_transformer'
 DATABASE_URL=sqlite:///storage/lamm.db
 FAISS_INDEX_PATH=storage/vector_index
-TOP_K=5
+
+# Scoring Weights & Thresholds
 RELEVANCE_WEIGHT=0.30
 RECENCY_WEIGHT=0.15
 CONFIDENCE_WEIGHT=0.20
@@ -391,261 +209,93 @@ UTILITY_WEIGHT=0.10
 REDUNDANCY_THRESHOLD=0.86
 ARCHIVE_THRESHOLD=0.32
 FORGET_THRESHOLD=0.18
-RECENCY_DECAY=0.03
 COMPRESS_LENGTH=180
 MAX_ACTIVE_MEMORIES=100
 ```
 
-Do not commit `.env`.
+---
 
-## Installation
+## 10. Memory Lifecycle Operations Detailed
 
-Using your virtual environment:
+| Operation | Trigger Condition | Storage Action |
+| :--- | :--- | :--- |
+| **UPDATE** | Evidence of contradiction, supersession, or temporal change | Modifies existing memory text in-place; updates vector in FAISS. |
+| **MERGE** | Redundancy score $\ge 0.86$ or lexical similarity $\ge 0.40$ | Combines facts into concise representation; updates existing record. |
+| **COMPRESS** | Candidate character length $> 180$ characters | Condenses text in-place before indexing; updates FAISS vector. |
+| **FORGET** | Ephemeral keywords detected OR composite score $\le 0.18$ | Marks as `FORGOTTEN` in SQLite; removes vector from FAISS. |
+| **ARCHIVE** | Confidence $< 0.50$, capacity reached, or score $\le 0.32$ | Marks as `ARCHIVED` in SQLite; removes vector from FAISS. |
+| **RETAIN** | High confidence, informative, non-redundant fact | Stores active record in SQLite; adds normalized vector to FAISS. |
 
-```powershell
-.\lammenv\Scripts\activate
-pip install -r requirements.txt
-```
+---
 
-Optional transformer embedding support:
+## 11. Two-Level Evaluation Framework
 
-```powershell
-pip install -r requirements-ml.txt
-```
+The evaluation harness implements a fair 3-way comparison on strictly identical turn sequences:
 
-The default `EMBEDDING_MODEL=hash` works offline and does not require downloading transformer models.
+| Dimension | LAMM (Proposed) | UNMANAGED_MEMORY | RECENCY_ONLY (LRU) |
+| :--- | :--- | :--- | :--- |
+| **Policy** | Multi-factor Adaptive Lifecycle | Unconditional persistence | Fixed active budget ($N=5$) |
+| **Eviction** | Intelligent (Score/Relations) | None (unbounded growth) | Least-recently accessed |
+| **Update Handling** | In-place fact supersession | Stored as separate duplicate | Old fact evicted by time only |
+| **Token Impact** | Measured reduction via compression & pruning | High prompt bloat | Low (but risks dropping facts) |
 
-## Gemini Setup
+### Generated Research Figures (`results/figures/`):
+1. `memory_growth.png` — Total stored memory curves across turns.
+2. `active_memory_count.png` — Active retrievable memory footprint comparisons.
+3. `token_context_consumption.png` — Prompt token consumption across conversation turns.
+4. `retrieval_latency.png` — Semantic vector search latency distributions.
+5. `lifecycle_operations.png` — Distribution of LAMM lifecycle decisions.
+6. `retrieval_quality.png` — Precision@k, Recall@k, and MRR on ground-truth queries.
 
-Put your key in `.env`:
+---
 
-```text
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-flash-latest
-```
+## 12. FastAPI Endpoints Reference
 
-Verify Gemini:
+The FastAPI server exposes 11 endpoints grouped into three categories:
 
-```powershell
-.\lammenv\Scripts\python.exe scripts\run_gemini_smoke.py
-```
+### Conversational Agent
+- `POST /chat` — Ingests user message, retrieves active memories, generates response, and runs lifecycle controller.
 
-Expected output:
+### Memory Management
+- `POST /memory` — Directly evaluates a candidate memory through LAMM (supports `dry_run=True`).
+- `GET /memories` — Lists all memories stored in SQLite (active, archived, forgotten).
+- `GET /memory/{id}` — Fetches a single memory record by its UUID.
+- `DELETE /memory/{id}` — Explicit privacy deletion (marks forgotten, unindexes from FAISS).
+- `GET /memory/search` — Semantic vector similarity search over active memories.
+- `GET /memory/stats` — Summary counts of total, active, archived, and forgotten memories.
+- `POST /memory/rebuild-index` — Synchronizes and rebuilds FAISS index from SQLite active records.
+- `GET /lifecycle/events` — Fetches the complete immutable audit trail of lifecycle decisions.
 
-```text
-LAMM Gemini smoke test passed
-```
+### Evaluation
+- `POST /evaluation/run` — Triggers the 3-way evaluation benchmark and generates all artifacts.
+- `GET /evaluation/results` — Returns the JSON results from the latest evaluation run.
 
-If a configured Gemini model is unavailable, the adapter tries to select another available `generateContent` model.
+---
 
-## Running Offline Demo
+## 13. Privacy & Security Notes
 
-```powershell
-.\lammenv\Scripts\python.exe scripts\run_demo.py
-```
+- **Zero Data Leakage in Offline Mode:** By default, all embeddings and mock LLM calls run 100% locally.
+- **Privacy Deletion (`DELETE /memory/{id}`):** Supports GDPR/privacy compliance by removing records from vector retrieval and recording an audit trail.
+- **Local Vectors:** Embeddings are stored in local binary files, not on third-party cloud servers.
+- **Secret Isolation:** `.env` is git-ignored and never checked into source control.
 
-This demo is deterministic and intentionally shows:
+---
 
-- retain
-- merge
-- update
-- archive
-- compress
-- forget
-- future query retrieval
+## 14. Academic Transparency & Limitations
 
-Final query:
+1. **Synthetic Dataset:** The included `synthetic_demo.json` dataset is designed for demonstration and proof-of-concept verification; it is not a large-scale conversational benchmark.
+2. **Heuristic Calibration:** Default scoring weights ($0.30, 0.15, 0.20, 0.25, 0.10$) and thresholds ($0.86, 0.32, 0.18$) are engineering defaults, not scientifically optimized constants.
+3. **No Unsubstantiated Claims:** All reported memory and token reduction percentages are measured outputs from local runs on the synthetic scenario.
 
-```text
-What programming language am I currently using for my backend project?
-```
+---
 
-Expected answer:
+## 15. Summary Documentation Links
 
-```text
-You are currently using Java for your backend project.
-```
+- [VS Code Execution Guide](docs/vscode_setup.md)
+- [Architecture & Design Principles](docs/architecture.md)
+- [Mathematical Formulation & Algorithm](docs/lamm_algorithm.md)
+- [Evaluation Framework & Metric Definitions](docs/evaluation.md)
 
-## Running Gemini Demo
+---
 
-The demo defaults to offline mode for reproducibility. To allow Gemini:
-
-```powershell
-$env:USE_GEMINI="1"
-.\lammenv\Scripts\python.exe scripts\run_demo.py
-```
-
-## Running The API
-
-```powershell
-.\lammenv\Scripts\uvicorn.exe app.main:app --reload
-```
-
-Open:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-API endpoints:
-
-- `POST /chat`
-- `POST /memory`
-- `GET /memory/{id}`
-- `GET /memories`
-- `DELETE /memory/{id}`
-- `POST /memory/rebuild-index`
-- `GET /memory/stats`
-- `GET /lifecycle/events`
-- `POST /evaluation/run`
-- `GET /evaluation/results`
-
-## Running Streamlit Dashboard
-
-```powershell
-.\lammenv\Scripts\streamlit.exe run dashboard\streamlit_app.py
-```
-
-Dashboard pages:
-
-- Chat
-- Memory
-- Analytics
-- Comparison
-
-## Running Tests
-
-```powershell
-.\lammenv\Scripts\python.exe -m pytest
-```
-
-Tests are designed to run offline and should not require Gemini.
-
-Covered areas:
-
-- scoring
-- lifecycle decisions
-- deduplication/update detection
-- FAISS retrieval
-- SQLite persistence
-- unmanaged baseline
-- end-to-end mock pipeline
-
-## Running Evaluation
-
-```powershell
-.\lammenv\Scripts\python.exe scripts\run_evaluation.py
-```
-
-Outputs:
-
-```text
-results/tables/memory_growth.csv
-results/tables/retrieval.csv
-results/reports/evaluation_report.json
-results/reports/evaluation_report.md
-results/figures/memory_growth.png
-results/figures/lifecycle_operations.png
-```
-
-The evaluation uses synthetic demo data. Do not present it as benchmark proof.
-
-## Baseline
-
-The baseline is `UNMANAGED_MEMORY`.
-
-It:
-
-- extracts candidate memories
-- stores all extracted memories
-- does not apply adaptive lifecycle management
-- uses the same retrieval mechanism
-
-Purpose:
-
-```text
-Compare unmanaged persistent memory vs adaptive lifecycle memory management.
-```
-
-## Synthetic Demo Dataset
-
-Located at:
-
-```text
-data/evaluation/synthetic_demo.json
-```
-
-It includes:
-
-- repeated facts
-- updated facts
-- low-confidence facts
-- verbose memory
-- temporary/forgettable information
-- future query
-
-It is labeled synthetic and should be used only for development/demo.
-
-## Result Interpretation
-
-Generated result files are measured outputs from local runs.
-
-They should be described as:
-
-```text
-Measured on the included synthetic demo scenario.
-```
-
-They should not be described as:
-
-```text
-Proof that LAMM outperforms all existing memory systems.
-```
-
-## Privacy Notes
-
-- `.env` is ignored by Git.
-- API keys are never hard-coded.
-- Local SQLite and FAISS files are used.
-- Offline mode sends nothing to Gemini.
-- Gemini mode sends prompt/context to Gemini for generation or extraction.
-- Do not place real sensitive personal data in demo datasets.
-
-## Known Limitations
-
-- Deterministic extraction is rule-based and simple.
-- Update detection is heuristic.
-- Merge/compression fallback is simple text processing.
-- Synthetic data is not a real benchmark.
-- Default thresholds are engineering assumptions.
-- The current Gemini package works but warns that Google recommends migrating from `google.generativeai` to `google.genai` in the future.
-- FAISS deletion is handled through active-ID filtering and rebuilds.
-
-## Future Work
-
-- Add a production vector database adapter.
-- Add stronger contradiction and temporal update detection.
-- Add better Gemini JSON extraction prompts.
-- Add human-rated conversational quality metrics.
-- Add support for LOCOMO/MSC-style benchmark evaluation.
-- Add token counting with model-specific tokenizers.
-- Add exportable review-panel report generation.
-- Migrate Gemini adapter to the newer `google.genai` SDK.
-
-## Quick Command Reference
-
-```powershell
-.\lammenv\Scripts\activate
-pip install -r requirements.txt
-pip install -r requirements-ml.txt
-.\lammenv\Scripts\python.exe scripts\run_gemini_smoke.py
-.\lammenv\Scripts\python.exe scripts\run_demo.py
-.\lammenv\Scripts\python.exe -m pytest
-.\lammenv\Scripts\python.exe scripts\run_evaluation.py
-.\lammenv\Scripts\uvicorn.exe app.main:app --reload
-.\lammenv\Scripts\streamlit.exe run dashboard\streamlit_app.py
-```
-
-## Final Note
-
-LAMM is a research prototype. Its goal is to demonstrate a clear, explainable, reproducible approach to adaptive long-term memory management for LLM agents. It is intentionally built so that the system can be demonstrated offline, tested without external APIs, and extended later with stronger models, datasets, or vector databases.
+*LAMM: Lightweight Adaptive Memory Management for Long-Term LLM Agents — B.Tech Mini Project*
