@@ -36,7 +36,7 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "sentence_transformer")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///storage/lamm.db")

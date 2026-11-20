@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from app.llm.base import LLMClient
+from app.llm.google_genai_client import create_google_genai_client
+
+logger = logging.getLogger(__name__)
 
 
 class MockLLMClient(LLMClient):
@@ -17,58 +22,33 @@ class GeminiLLMClient(LLMClient):
     def __init__(self, api_key: str, model_name: str):
         self.available = False
         self.last_error: str | None = None
-        self.genai = None
         self.model_name = model_name
+        self.client = None
+        # ContextBuilder uses the model object only when it exposes count_tokens.
+        # Token counts remain estimated for the new SDK's simple prompt adapter.
+        self.model = None
         try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=api_key)
-            self.genai = genai
-            self.model = genai.GenerativeModel(model_name)
+            self.client = create_google_genai_client(api_key)
+            self.model = model_name
             self.available = True
         except Exception as exc:
-            self.model = None
             self.last_error = str(exc)
+            logger.warning("Gemini client is unavailable; using offline mock: %s", exc)
         self.fallback = MockLLMClient()
 
     def generate(self, prompt: str) -> str:
-        if self.model is None:
+        if self.client is None:
             return self.fallback.generate(prompt)
         try:
             self.last_error = None
-            return self.model.generate_content(prompt).text
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+            )
+            if response.text:
+                return response.text
+            raise ValueError("Gemini returned an empty text response.")
         except Exception as exc:
             self.last_error = str(exc)
-            fallback = self._build_available_fallback()
-            if fallback is not None:
-                try:
-                    self.model = fallback
-                    self.last_error = None
-                    return self.model.generate_content(prompt).text
-                except Exception as retry_exc:
-                    self.last_error = str(retry_exc)
+            logger.warning("Gemini generation failed; using offline mock: %s", exc)
             return self.fallback.generate(prompt)
-
-    def _build_available_fallback(self):
-        if self.genai is None:
-            return None
-        preferred = [
-            "models/gemini-flash-latest",
-            "models/gemini-2.5-flash",
-            "models/gemini-flash-lite-latest",
-            "models/gemini-pro-latest",
-        ]
-        try:
-            available = []
-            for model in self.genai.list_models():
-                methods = getattr(model, "supported_generation_methods", []) or []
-                if "generateContent" in methods:
-                    available.append(model.name)
-            selected = next((name for name in preferred if name in available), None)
-            selected = selected or (available[0] if available else None)
-            if selected:
-                self.model_name = selected
-                return self.genai.GenerativeModel(selected)
-        except Exception as exc:
-            self.last_error = str(exc)
-        return None

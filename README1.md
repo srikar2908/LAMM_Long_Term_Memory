@@ -618,7 +618,7 @@ Proof that LAMM outperforms all existing memory systems.
 - Merge/compression fallback is simple text processing.
 - Synthetic data is not a real benchmark.
 - Default thresholds are engineering assumptions.
-- The current Gemini package works but warns that Google recommends migrating from `google.generativeai` to `google.genai` in the future.
+- Gemini integration uses Google's supported `google-genai` Python SDK.
 - FAISS deletion is handled through active-ID filtering and rebuilds.
 
 ## Future Work
@@ -630,7 +630,7 @@ Proof that LAMM outperforms all existing memory systems.
 - Add support for LOCOMO/MSC-style benchmark evaluation.
 - Add token counting with model-specific tokenizers.
 - Add exportable review-panel report generation.
-- Migrate Gemini adapter to the newer `google.genai` SDK.
+- Improve Gemini JSON memory extraction prompts.
 
 ## Quick Command Reference
 

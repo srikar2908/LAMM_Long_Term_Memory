@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import sys
 import json
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import pandas as pd
 import streamlit as st
 
@@ -130,6 +136,11 @@ if page == "💬 Agent Chat":
             with st.spinner("Processing memory retrieval & lifecycle management..."):
                 resp = agent.chat(user_input, conversation_id="web_session")
                 st.write(resp.response)
+                if getattr(agent.llm, "last_error", None):
+                    st.warning(
+                        "Gemini could not complete this request, so the offline fallback was used. "
+                        "Check the API key, model name, and network connection."
+                    )
 
                 st.session_state.messages.append({"role": "assistant", "content": resp.response})
                 st.session_state.latest_retrieved = resp.retrieved_memories

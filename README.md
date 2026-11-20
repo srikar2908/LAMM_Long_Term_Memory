@@ -97,7 +97,7 @@ LAMM does **not** require any cloud vector database subscriptions. It runs compl
 ## 6. Technology Stack
 
 - **Core:** Python 3.12, FastAPI, Pydantic v2, SQLite3, FAISS-CPU, NumPy, Pandas, Matplotlib, PyYAML, Pytest
-- **LLM Engine:** Deterministic Mock LLM (default / offline) or Google Gemini API (`google-generativeai`)
+- **LLM Engine:** Deterministic Mock LLM (default / offline) or Google Gemini API (`google-genai`)
 - **Embeddings:** Deterministic hash embeddings (384-d, zero dependencies) or Sentence-Transformers (`all-MiniLM-L6-v2`)
 - **User Interface:** Streamlit (4-page research dashboard)
 

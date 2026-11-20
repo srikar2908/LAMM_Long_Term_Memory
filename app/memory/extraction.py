@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 
 from pydantic import ValidationError
 
+from app.llm.google_genai_client import create_google_genai_client
 from app.memory.schemas import CandidateMemory
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryExtractor(ABC):
@@ -60,16 +64,15 @@ class DeterministicMemoryExtractor(MemoryExtractor):
 class GeminiMemoryExtractor(MemoryExtractor):
     def __init__(self, api_key: str, model_name: str, fallback: MemoryExtractor | None = None):
         self.fallback = fallback or DeterministicMemoryExtractor()
+        self.client = None
+        self.model_name = model_name
         try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model_name)
+            self.client = create_google_genai_client(api_key)
         except Exception:
-            self.model = None
+            self.client = None
 
     def extract(self, user_message: str, assistant_message: str | None = None) -> list[CandidateMemory]:
-        if self.model is None:
+        if self.client is None:
             return self.fallback.extract(user_message, assistant_message)
         prompt = (
             "Extract durable long-term memory candidates from the user message. "
@@ -78,9 +81,15 @@ class GeminiMemoryExtractor(MemoryExtractor):
             f"User: {user_message}\nAssistant: {assistant_message or ''}"
         )
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+            )
+            if not response.text:
+                return self.fallback.extract(user_message, assistant_message)
             text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
             raw = json.loads(text)
             return [CandidateMemory.model_validate(item) for item in raw]
-        except (json.JSONDecodeError, ValidationError, Exception):
+        except (json.JSONDecodeError, ValidationError, Exception) as exc:
+            logger.warning("Gemini memory extraction failed; using deterministic fallback: %s", exc)
             return self.fallback.extract(user_message, assistant_message)
